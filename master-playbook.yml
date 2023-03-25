@@ -1,0 +1,16 @@
+- hosts: kubemaster
+  become: yes
+  environment:
+    KUBECONFIG: '{{ kube_config }}'
+  roles:
+  - role: common
+    tags:
+    - install-kubeadm
+
+  - role: master
+    tags:
+    - install-kubeadm
+
+  - role: jenkins
+    tags:
+    - install-jenkins

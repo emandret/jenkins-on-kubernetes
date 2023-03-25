@@ -1,0 +1,108 @@
+- name: Install package dependencies
+  apt:
+    name: '{{ packages }}'
+    state: present
+    update_cache: yes
+  vars:
+    packages:
+    - apt-transport-https
+    - ca-certificates
+    - curl
+    - gnupg-agent
+    - software-properties-common
+    - yq
+
+- name: Add Docker APT signing key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Add Docker stable APT repository
+  apt_repository:
+    repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable
+    state: present
+
+- name: Install Docker and dependencies
+  apt:
+    name: '{{ packages }}'
+    state: present
+    update_cache: yes
+  vars:
+    packages:
+    - docker-ce
+    - docker-ce-cli
+    - containerd.io
+    notify:
+    - docker status
+
+- name: Copy the Docker daemon configuration
+  copy:
+    src: daemon.json
+    dest: /etc/docker/daemon.json
+    remote_src: no
+  become: yes
+
+- name: Restart the Docker daemon
+  service:
+    name: docker
+    state: restarted
+    daemon_reload: yes
+
+- name: Create docker group with GID 1001
+  group:
+    name: docker
+    gid: 1001
+
+- name: Add current user to docker group
+  user:
+    name: '{{ ansible_user }}'
+    groups:
+    - docker
+    append: yes
+
+- name: Remove swapfile mountpoint from /etc/fstab
+  mount:
+    name: '{{ item }}'
+    fstype: swap
+    state: absent
+  with_items:
+  - swap
+  - none
+
+- name: Disable swap
+  command: swapoff -a
+  when: ansible_swaptotal_mb > 0
+
+- name: Add Kubernetes APT signing key
+  apt_key:
+    url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+    state: present
+
+- name: Add Kubernetes main APT repository
+  apt_repository:
+    repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+    state: present
+    filename: kubernetes.list
+
+- name: Install Kubernetes binaries
+  apt:
+    name: '{{ packages }}'
+    state: present
+    update_cache: yes
+  vars:
+    packages:
+    - kubelet
+    - kubeadm
+    - kubectl
+
+- name: Set the node IP to the host-only static IP
+  lineinfile:
+    path: /etc/default/kubelet
+    line: KUBELET_EXTRA_ARGS=--node-ip={{ ansible_host }}
+    create: yes
+
+- name: Restart the kubelet daemon
+  service:
+    name: kubelet
+    daemon_reload: yes
+    state: restarted

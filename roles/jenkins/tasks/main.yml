@@ -1,0 +1,33 @@
+- name: Create jenkins group with GID 1002
+  group:
+    name: jenkins
+    gid: 1002
+
+- name: Create jenkins user with UID 1002
+  user:
+    name: jenkins
+    group: jenkins
+    password: '!' # login is disabled for this account
+    create_home: yes
+    uid: 1002
+
+- name: Create Jenkins local PV directory
+  file:
+    path: '{{ jenkins_volume }}'
+    state: directory
+    owner: jenkins
+    group: jenkins
+    mode: 0755
+
+- name: Copy local manifest
+  copy:
+    src: ./jenkins-master.yaml
+    dest: /home/{{ ansible_user }}
+    mode: 0644
+    remote_src: no
+
+- name: Spin up the Jenkins master
+  command: '{{ item }}'
+  with_items:
+  - kubectl create ns '{{ jenkins_namespace }}'
+  - kubectl apply -f jenkins-master.yaml -n '{{ jenkins_namespace }}'
